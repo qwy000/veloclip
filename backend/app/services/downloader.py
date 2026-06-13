@@ -48,6 +48,46 @@ PLATFORM_COOKIE_MAP: list[tuple[tuple[str, ...], str]] = [
     (("kuaishou.com",), "kuaishou.txt"),
     (("ixigua.com", "toutiao.com"), "ixigua.txt"),
     (("weibo.com", "weibo.cn"), "weibo.txt"),
+    (("iqiyi.com", "iq.com", "pps.tv"), "iqiyi.txt"),
+]
+
+# 可直接被 yt-dlp 识别的视频平台域名
+_DIRECT_VIDEO_HOSTS = (
+    "youtube.com",
+    "youtu.be",
+    "bilibili.com",
+    "b23.tv",
+    "douyin.com",
+    "iesdouyin.com",
+    "v.douyin.com",
+    "tiktok.com",
+    "ixigua.com",
+    "v.ixigua.com",
+    "instagram.com",
+    "x.com",
+    "twitter.com",
+    "kuaishou.com",
+    "v.kuaishou.com",
+    "weibo.com",
+    "weibo.cn",
+    "iqiyi.com",
+    "iq.com",
+    "pps.tv",
+)
+
+# 从网页 HTML 中提取嵌入视频链接（按优先级排序）
+_EMBEDDED_VIDEO_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"https?://(?:www\.)?bilibili\.com/video/[A-Za-z0-9]+/?"), r"\g<0>"),
+    (re.compile(r"https?://(?:www\.)?b23\.tv/[A-Za-z0-9]+/?"), r"\g<0>"),
+    (
+        re.compile(r"https?://(?:www\.)?(?:youtube\.com/watch\?[^\s\"'<>\\]+|youtu\.be/[^\s\"'<>\\]+)"),
+        r"\g<0>",
+    ),
+    (re.compile(r"https?://(?:www\.)?douyin\.com/video/\d+"), r"\g<0>"),
+    (re.compile(r"https?://v\.douyin\.com/[A-Za-z0-9/_-]+/?"), r"\g<0>"),
+    (re.compile(r"https?://(?:www\.)?ixigua\.com/\d+/?"), r"\g<0>"),
+    (re.compile(r"https?://(?:www\.)?tiktok\.com/@[^/]+/video/\d+"), r"\g<0>"),
+    (re.compile(r"BV[0-9A-Za-z]{10}"), r"https://www.bilibili.com/video/\g<0>"),
 ]
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
@@ -70,6 +110,59 @@ def _follow_redirect(url: str) -> Optional[str]:
         return None
 
 
+def _fetch_page_html(url: str) -> Optional[str]:
+    """抓取网页 HTML，用于从课程/文章页提取嵌入的视频链接。"""
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": DESKTOP_UA})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            return resp.read().decode("utf-8", errors="replace")
+    except Exception:
+        return None
+
+
+def _is_direct_video_url(url: str) -> bool:
+    """判断是否为 yt-dlp 可直接识别的视频平台链接或直链。"""
+    if re.search(r"\.(mp4|m3u8|webm)(\?|$)", url, re.I):
+        return True
+    host = urlparse(url).netloc.lower().removeprefix("www.")
+    return any(host == h or host.endswith("." + h) for h in _DIRECT_VIDEO_HOSTS)
+
+
+def _extract_embedded_video_url(html: str) -> Optional[str]:
+    """从网页内容中提取第一个可识别的嵌入视频链接。"""
+    for pattern, repl in _EMBEDDED_VIDEO_PATTERNS:
+        match = pattern.search(html)
+        if match:
+            extracted = match.expand(repl).rstrip(")]")
+            return normalize_url(extracted)
+    return None
+
+
+def resolve_video_url(url: str) -> tuple[str, Optional[str]]:
+    """解析用户输入，必要时从网页中提取真实视频链接。
+
+    返回 (video_url, source_page_url)。若用户粘贴的是课程/文章页等嵌入视频的网页，
+    source_page_url 为原始链接，video_url 为识别出的平台直链。
+    """
+    original = (url or "").strip()
+    if not original:
+        return original, None
+    if not urlparse(original).scheme:
+        original = "https://" + original
+
+    normalized = normalize_url(original)
+    if _is_direct_video_url(normalized):
+        return normalized, None
+
+    html = _fetch_page_html(normalized)
+    if html:
+        embedded = _extract_embedded_video_url(html)
+        if embedded and _is_direct_video_url(embedded):
+            return embedded, original
+
+    return normalized, None
+
+
 def normalize_url(url: str) -> str:
     """规范化各平台链接，修正 yt-dlp 无法直接识别的形式。
 
@@ -82,7 +175,16 @@ def normalize_url(url: str) -> str:
     if not url:
         return url
     parsed = urlparse(url)
+    if not parsed.scheme:
+        url = "https://" + url
+        parsed = urlparse(url)
     host = parsed.netloc.lower()
+
+    # B 站：统一为 www.bilibili.com/video/{id}
+    if "bilibili.com" in host:
+        m = re.search(r"/video/([A-Za-z0-9]+)", parsed.path)
+        if m:
+            return f"https://www.bilibili.com/video/{m.group(1)}"
 
     # 抖音：从 modal_id 查询参数中提取视频 id
     if "douyin.com" in host:
@@ -167,10 +269,10 @@ def _base_opts(url: str = "") -> dict:
 
 def extract_info(url: str) -> InfoResponse:
     """解析视频信息，归并出标准清晰度档位 + 仅音频选项。"""
-    url = normalize_url(url)
-    opts = {**_base_opts(url), "skip_download": True}
+    video_url, source_page = resolve_video_url(url)
+    opts = {**_base_opts(video_url), "skip_download": True}
     with YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(url, download=False)
+        info = ydl.extract_info(video_url, download=False)
 
     # 某些链接可能返回播放列表，取第一条
     if info.get("_type") == "playlist" and info.get("entries"):
@@ -239,7 +341,8 @@ def extract_info(url: str) -> InfoResponse:
         thumbnail=info.get("thumbnail"),
         duration=duration,
         uploader=info.get("uploader") or info.get("channel"),
-        webpage_url=info.get("webpage_url") or url,
+        webpage_url=info.get("webpage_url") or video_url,
+        resolved_url=video_url if source_page else None,
         formats=formats,
     )
 
@@ -355,11 +458,11 @@ def _make_pp_hook(task_id: str):
 def run_download(task_id: str, url: str, quality: str) -> None:
     """在后台线程中执行的下载主流程。"""
     try:
-        url = normalize_url(url)
+        video_url, _ = resolve_video_url(url)
         store.update(task_id, status="downloading", percent=0.0)
-        opts = _build_download_opts(task_id, quality, url)
+        opts = _build_download_opts(task_id, quality, video_url)
         with YoutubeDL(opts) as ydl:
-            info = ydl.extract_info(url, download=True)
+            info = ydl.extract_info(video_url, download=True)
 
         if info.get("_type") == "playlist" and info.get("entries"):
             info = info["entries"][0]
@@ -404,17 +507,20 @@ def _resolve_output_file(workdir: Path, info: dict, quality: str) -> Optional[Pa
 def _friendly_error(message: str) -> str:
     msg = message.lower()
     if "sign in to confirm" in msg or "not a bot" in msg or "confirm you" in msg:
-        return "YouTube 触发了人机验证，需要提供登录 Cookie 才能下载（参考 backend/cookies/README）。"
+        return "YouTube 触发了人机验证，当前无法免登录解析，请更换其他平台视频链接。"
     if "412" in msg or "precondition failed" in msg:
-        return "该平台触发了风控（如 B 站），请提供登录 Cookie 后重试（参考 backend/cookies/README）。"
+        return "该平台触发了风控，请稍后重试或粘贴 B 站/YouTube 等平台的直接视频链接。"
     if "drm" in msg:
         return "该视频受版权保护（DRM），无法下载。"
     if "cookie" in msg:
-        return "该平台需要 Cookie 才能解析（如西瓜/快手/微博等），请在 backend/cookies 放置对应平台 Cookie 后重试（参考 backend/cookies/README）。"
+        return "该平台暂无法免登录解析，请粘贴 B 站、抖音、TikTok 等平台的直接视频链接。"
     if "private" in msg or "members-only" in msg or "login" in msg or "sign in" in msg:
-        return "该视频需要登录或为私密/会员内容，请提供对应平台的登录 Cookie 后重试。"
+        return "该视频需要登录或为私密/会员内容，暂无法下载。"
     if "geo" in msg or "not available in your" in msg:
         return "该视频存在地区限制，当前网络无法访问。"
     if "unsupported url" in msg or "no video" in msg:
-        return "暂不支持该链接或未识别到视频，请检查链接是否正确。"
+        return (
+            "未能从该链接识别到可下载的视频。请粘贴 B 站/YouTube/抖音 等平台的直接视频链接，"
+            "或包含嵌入视频的课程/文章页面链接。"
+        )
     return "解析或下载失败，请稍后重试或更换链接。"

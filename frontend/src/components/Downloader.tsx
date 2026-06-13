@@ -11,6 +11,7 @@ import {
   XCircle,
   X,
   RotateCcw,
+  TextSelect,
 } from "lucide-react";
 import {
   fetchInfo,
@@ -56,6 +57,7 @@ export default function Downloader() {
 
   const pollsRef = useRef<Map<string, number>>(new Map());
   const triggeredRef = useRef<Set<string>>(new Set());
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     return () => {
@@ -72,6 +74,11 @@ export default function Downloader() {
     } catch {
       /* browser may deny clipboard */
     }
+  }
+
+  function handleSelectAll() {
+    inputRef.current?.focus();
+    inputRef.current?.select();
   }
 
   async function handleParse() {
@@ -192,12 +199,20 @@ export default function Downloader() {
           <div className="flex flex-1 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2.5">
             <VideoIcon className="h-5 w-5 shrink-0 text-brand" />
             <input
+              ref={inputRef}
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleParse()}
-              placeholder="粘贴视频链接，支持 YouTube / B站 / 抖音 / TikTok / X ..."
+              placeholder="粘贴视频链接或课程/文章页面，支持自动识别嵌入的 B站 / YouTube / 抖音 等视频"
               className="w-full bg-transparent text-sm text-ink outline-none placeholder:text-slate-400 sm:text-base"
             />
+            <button
+              onClick={handleSelectAll}
+              title="全选"
+              className="shrink-0 rounded-full p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-brand"
+            >
+              <TextSelect className="h-4 w-4" />
+            </button>
             <button
               onClick={handlePaste}
               title="粘贴"
@@ -244,6 +259,11 @@ export default function Downloader() {
               <div className="flex min-w-0 flex-1 flex-col">
                 <h3 className="line-clamp-2 text-left text-base font-semibold text-ink">{info.title}</h3>
                 {info.uploader && <p className="mt-1 text-left text-sm text-ink-muted">{info.uploader}</p>}
+                {info.resolved_url && (
+                  <p className="mt-1 text-left text-xs text-brand">
+                    已从页面识别视频链接：{info.resolved_url}
+                  </p>
+                )}
 
                 <div className="mt-3 flex flex-wrap gap-2">
                   {info.formats.map((f) => {

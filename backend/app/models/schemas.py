@@ -23,6 +23,10 @@ class InfoResponse(BaseModel):
     duration: Optional[int] = None
     uploader: Optional[str] = None
     webpage_url: Optional[str] = None
+    resolved_url: Optional[str] = Field(
+        default=None,
+        description="从网页中自动识别出的真实视频链接（若用户粘贴的是嵌入视频的页面）",
+    )
     formats: list[FormatOption]
 
 

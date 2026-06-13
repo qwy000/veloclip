@@ -328,19 +328,19 @@ function Features() {
 function Pricing() {
   return (
     <section id="pricing" className="py-20">
-      <div className="section">
+      <div className="section max-w-5xl">
         <SectionTitle
           eyebrow="会员定价"
           title="选择适合你的方案"
           subtitle="免费即可上手，升级 Pro 解锁无限次下载与 4K 超清，效率翻倍。"
         />
-        <div className="mt-12 grid items-stretch gap-6 lg:grid-cols-3">
+        <div className="mt-12 grid items-stretch gap-4 md:grid-cols-3 md:gap-5">
           {PLANS.map((p) => (
             <div
               key={p.name}
-              className={`relative flex flex-col rounded-2xl p-8 transition-all duration-200 ${
+              className={`relative flex flex-col rounded-2xl p-5 transition-all duration-200 md:p-6 ${
                 p.highlight
-                  ? "scale-[1.02] border-2 border-brand bg-white shadow-cardHover lg:-mt-2"
+                  ? "border-2 border-brand bg-white shadow-cardHover"
                   : "card hover:-translate-y-1 hover:shadow-cardHover"
               }`}
             >
@@ -355,9 +355,9 @@ function Pricing() {
                 <span className="text-4xl font-extrabold text-ink">{p.price}</span>
                 <span className="mb-1 text-sm text-ink-muted">{p.period}</span>
               </div>
-              <ul className="mt-6 flex-1 space-y-3">
+              <ul className="mt-6 w-full flex-1 space-y-2 text-sm">
                 {p.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm text-ink">
+                  <li key={f} className="flex items-start gap-2 text-ink">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
                     {f}
                   </li>

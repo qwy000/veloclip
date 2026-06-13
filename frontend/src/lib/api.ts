@@ -12,6 +12,7 @@ export interface VideoInfo {
   duration?: number | null;
   uploader?: string | null;
   webpage_url?: string | null;
+  resolved_url?: string | null;
   formats: FormatOption[];
 }
 

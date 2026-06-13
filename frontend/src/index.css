@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-white text-ink antialiased font-sans;
+}
+
+@layer components {
+  .btn-pill {
+    @apply inline-flex items-center justify-center gap-2 rounded-full font-medium transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn-pill bg-brand text-white shadow-glow hover:bg-brand-600 hover:-translate-y-0.5 active:translate-y-0;
+  }
+  .btn-ghost {
+    @apply btn-pill bg-white text-ink border border-slate-200 shadow-card hover:border-brand-100 hover:text-brand;
+  }
+  .card {
+    @apply rounded-2xl bg-white border border-slate-100 shadow-card;
+  }
+  .section {
+    @apply mx-auto w-full max-w-6xl px-5 sm:px-6;
+  }
+  .eyebrow {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-600;
+  }
+}
+
+/* 渐变背景网格点缀 */
+.hero-gradient {
+  background:
+    radial-gradient(60% 60% at 50% 0%, rgba(23, 119, 255, 0.12) 0%, rgba(23, 119, 255, 0) 70%),
+    linear-gradient(180deg, #f6f9ff 0%, #ffffff 60%);
+}

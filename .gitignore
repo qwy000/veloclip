@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Backend temp downloads
+backend/downloads/
+
+# Cookies (登录态，切勿入库)
+backend/cookies/*.txt
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Env & editor
+.env
+.env.local
+.DS_Store
+.idea/
+.vscode/

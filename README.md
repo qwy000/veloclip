@@ -1,4 +1,4 @@
-# 极速下 · 万能视频下载网站
+# VeloClip · 万能视频下载网站
 
 一个轻量的"万能视频下载"网站：**Python (FastAPI) + yt-dlp** 提供下载能力，**React + Tailwind** 打造商业化界面。全平台、高清无水印、手机电脑随时随地一键下载。
 
@@ -7,10 +7,11 @@
 ## 功能
 
 - 全平台视频解析与下载（YouTube / B站 / 抖音 / TikTok / X 等上千站点）
-- 清晰度自选（最佳 / 1080p / 720p / ... / 仅音频 MP3）
+- **课程/文章页嵌入视频自动识别**（如编程导航页面内嵌 B 站链接）
+- 清晰度自选（**最佳画质 1080p/4K 等具体分辨率** / 720p / ... / 仅音频 MP3）
 - 实时下载进度（百分比 / 速度 / 剩余时间）
 - 高清音视频自动合并（内置 ffmpeg，免手动安装）
-- 商业化响应式 UI，含定价区块（视觉展示）
+- 商业化响应式 UI（品牌 **VeloClip**），含定价区块（视觉展示）
 
 ## 技术栈
 
@@ -35,6 +36,8 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
+> 修改后端代码后需重启 uvicorn，否则 API 可能仍返回旧逻辑。
+
 ### 2. 启动前端（端口 5173）
 
 ```bash
@@ -49,9 +52,10 @@ npm run dev
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| POST | `/api/info` | 解析视频信息与可选清晰度 |
+| POST | `/api/info` | 解析视频信息与可选清晰度（含 `resolved_url` 若从网页识别） |
 | POST | `/api/download` | 创建下载任务，返回 `task_id` |
 | GET | `/api/progress/{task_id}` | 查询下载进度 |
+| POST | `/api/cancel/{task_id}` | 取消下载任务 |
 | GET | `/api/file/{task_id}` | 下载完成的文件 |
 
 ## 文档

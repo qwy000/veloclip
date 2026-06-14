@@ -267,6 +267,28 @@ def _base_opts(url: str = "") -> dict:
     return opts
 
 
+def _best_quality_label(raw_formats: list, info: dict | None = None) -> str:
+    """根据可用流计算最佳画质档位的具体分辨率文案。"""
+    heights = [
+        f.get("height")
+        for f in raw_formats
+        if f.get("height") and f.get("vcodec") not in (None, "none")
+    ]
+    if not heights and info:
+        info_height = info.get("height")
+        if isinstance(info_height, (int, float)) and info_height > 0:
+            heights = [int(info_height)]
+    if not heights:
+        return "最佳画质"
+    max_height = max(heights)
+    for std in STANDARD_HEIGHTS:
+        if max_height >= std:
+            if std == 2160:
+                return "最佳画质 4K"
+            return f"最佳画质 {std}p"
+    return f"最佳画质 {max_height}p"
+
+
 def extract_info(url: str) -> InfoResponse:
     """解析视频信息，归并出标准清晰度档位 + 仅音频选项。"""
     video_url, source_page = resolve_video_url(url)
@@ -297,11 +319,11 @@ def extract_info(url: str) -> InfoResponse:
                 break
 
     formats: list[FormatOption] = []
-    # 最佳画质优先展示
+    # 最佳画质优先展示，标注具体分辨率
     formats.append(
         FormatOption(
             quality="best",
-            label="最佳画质（自动）",
+            label=_best_quality_label(raw_formats, info),
             ext="mp4",
             filesize=None,
             type="video",

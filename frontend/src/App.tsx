@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import Downloader from "./components/Downloader";
 
+const SITE_NAME = "VeloClip";
+
 const PLATFORMS = [
   "YouTube",
   "哔哩哔哩",
@@ -114,7 +116,7 @@ const FAQS = [
   },
   {
     q: "需要安装软件吗？",
-    a: "完全不需要。极速下是纯网页工具，打开浏览器即可使用，手机和电脑都支持。",
+    a: "完全不需要。VeloClip 是纯网页工具，打开浏览器即可使用，手机和电脑都支持。",
   },
   {
     q: "有些视频无法下载怎么办？",
@@ -149,7 +151,7 @@ function Logo() {
         <Download className="h-5 w-5" />
       </span>
       <span className="text-lg font-bold tracking-tight text-ink">
-        极速下<span className="text-brand">·</span>
+        Velo<span className="text-brand">Clip</span>
       </span>
     </a>
   );
@@ -447,7 +449,7 @@ function Footer() {
         <div className="flex flex-col items-center justify-between gap-6 sm:flex-row">
           <Logo />
           <p className="text-sm text-ink-muted">
-            万能视频下载器 · 全平台 · 高清 · 无水印
+            {SITE_NAME} · 全平台 · 高清 · 无水印
           </p>
         </div>
         <div className="mt-8 rounded-xl bg-slate-50 px-5 py-4 text-center text-xs leading-relaxed text-slate-400">
@@ -455,7 +457,7 @@ function Footer() {
           下载内容的使用责任由用户自行承担，本站不存储任何用户下载的视频文件。
         </div>
         <p className="mt-6 text-center text-xs text-slate-400">
-          © {new Date().getFullYear()} 极速下 · Powered by yt-dlp
+          © {new Date().getFullYear()} {SITE_NAME} · Powered by yt-dlp
         </p>
       </div>
     </footer>

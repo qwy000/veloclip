@@ -46,3 +46,44 @@ class ProgressResponse(BaseModel):
     eta: Optional[str] = None
     filename: Optional[str] = None
     error: Optional[str] = None
+
+
+class TranscriptSegment(BaseModel):
+    start: float
+    end: float
+    text: str
+
+
+class AiAnalyzeRequest(BaseModel):
+    url: str = Field(..., description="视频链接")
+
+
+class AiAnalyzeResponse(BaseModel):
+    title: str
+    language: Optional[str] = None
+    segments: list[TranscriptSegment]
+    full_text: str
+    summary: str
+    mindmap: str
+    truncated: bool = False
+    subtitle_source: Optional[str] = Field(
+        default=None, description="cc | auto | danmaku"
+    )
+
+
+class AiChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class AiChatRequest(BaseModel):
+    url: str = Field(..., description="视频链接（用于无缓存字幕时重新提取）")
+    question: str = Field(..., description="用户问题")
+    transcript_text: Optional[str] = Field(
+        default=None, description="已提取的字幕全文，传入可避免重复拉取"
+    )
+    history: list[AiChatMessage] = Field(default_factory=list)
+
+
+class AiChatResponse(BaseModel):
+    answer: str

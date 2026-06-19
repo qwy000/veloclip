@@ -23,6 +23,7 @@ import {
   formatDuration,
   type VideoInfo,
 } from "../lib/api";
+import AiAnalysisPanel from "./AiAnalyzer";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -245,10 +246,17 @@ export default function Downloader() {
         {/* parse result */}
         {info && parsePhase === "ready" && (
           <div className="mx-2 mb-2 mt-2 rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
-            <div className="flex flex-col gap-4 sm:flex-row">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
               {info.thumbnail && (
-                <div className="relative aspect-video w-full shrink-0 overflow-hidden rounded-xl bg-slate-200 sm:w-48">
-                  <img src={info.thumbnail} alt={info.title} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                <div className="relative w-full shrink-0 overflow-hidden rounded-xl bg-slate-200 sm:w-48 sm:self-start">
+                  <div className="aspect-video w-full">
+                    <img
+                      src={info.thumbnail}
+                      alt={info.title}
+                      className="h-full w-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
                   {info.duration ? (
                     <span className="absolute bottom-1.5 right-1.5 rounded bg-black/70 px-1.5 py-0.5 text-xs text-white">
                       {formatDuration(info.duration)}
@@ -256,7 +264,7 @@ export default function Downloader() {
                   ) : null}
                 </div>
               )}
-              <div className="flex min-w-0 flex-1 flex-col">
+              <div className="min-w-0 flex-1">
                 <h3 className="line-clamp-2 text-left text-base font-semibold text-ink">{info.title}</h3>
                 {info.uploader && <p className="mt-1 text-left text-sm text-ink-muted">{info.uploader}</p>}
                 {info.resolved_url && (
@@ -286,13 +294,15 @@ export default function Downloader() {
                   })}
                 </div>
 
-                <div className="mt-4">
+                <div className="mt-4 flex flex-wrap gap-2">
                   <button onClick={handleDownload} className="btn-primary h-11 w-full sm:w-auto sm:px-8">
                     <Download className="h-5 w-5" /> 开始下载
                   </button>
                 </div>
               </div>
             </div>
+
+            <AiAnalysisPanel url={url.trim()} videoTitle={info.title} />
           </div>
         )}
       </div>

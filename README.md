@@ -11,11 +11,12 @@
 - 清晰度自选（**最佳画质 1080p/4K 等具体分辨率** / 720p / ... / 仅音频 MP3）
 - 实时下载进度（百分比 / 速度 / 剩余时间）
 - 高清音视频自动合并（内置 ffmpeg，免手动安装）
+- **AI 视频分析**（解析页内嵌）：字幕提取、DeepSeek 总结、思维导图（可导出 PNG）、AI 提问
 - 商业化响应式 UI（品牌 **VeloClip**），含定价区块（视觉展示）
 
 ## 技术栈
 
-- 后端：FastAPI + Uvicorn + yt-dlp + imageio-ffmpeg（无数据库，内存任务表）
+- 后端：FastAPI + Uvicorn + yt-dlp + imageio-ffmpeg + DeepSeek API（无数据库，内存任务表）
 - 前端：Vite + React + TypeScript + TailwindCSS + lucide-react
 
 ## 目录结构
@@ -38,6 +39,8 @@ uvicorn app.main:app --reload --port 8000
 
 > 修改后端代码后需重启 uvicorn，否则 API 可能仍返回旧逻辑。
 
+复制 `backend/.env.example` 为 `backend/.env` 并填写 `DEEPSEEK_API_KEY` 以启用 AI 分析。
+
 ### 2. 启动前端（端口 5173）
 
 ```bash
@@ -57,6 +60,9 @@ npm run dev
 | GET | `/api/progress/{task_id}` | 查询下载进度 |
 | POST | `/api/cancel/{task_id}` | 取消下载任务 |
 | GET | `/api/file/{task_id}` | 下载完成的文件 |
+| POST | `/api/ai/analyze` | AI 总结 + 思维导图（需 DeepSeek Key） |
+| POST | `/api/ai/transcript` | 仅提取字幕 |
+| POST | `/api/ai/chat` | 基于字幕的 AI 问答 |
 
 ## 文档
 

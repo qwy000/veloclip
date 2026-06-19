@@ -267,26 +267,52 @@ def _base_opts(url: str = "") -> dict:
     return opts
 
 
+def _format_short_edge(fmt: dict) -> int | None:
+    """按视频短边像素衡量清晰度（横屏取 height，竖屏取 width，与平台 720P/1080P 一致）。"""
+    w, h = fmt.get("width"), fmt.get("height")
+    if isinstance(w, (int, float)) and isinstance(h, (int, float)) and w > 0 and h > 0:
+        return int(min(w, h))
+    res = fmt.get("resolution") or ""
+    m = re.match(r"(\d+)x(\d+)", str(res))
+    if m:
+        return min(int(m.group(1)), int(m.group(2)))
+    h_only = fmt.get("height")
+    if isinstance(h_only, (int, float)) and h_only > 0:
+        return int(h_only)
+    note = f"{fmt.get('format_note') or ''} {fmt.get('format') or ''}"
+    m = re.search(r"(\d{3,4})[pP]", note)
+    if m:
+        return int(m.group(1))
+    return None
+
+
+def _collect_short_edge_heights(raw_formats: list, info: dict | None = None) -> list[int]:
+    edges: list[int] = []
+    for f in raw_formats:
+        edge = _format_short_edge(f)
+        if edge and f.get("vcodec") not in (None, "none"):
+            edges.append(edge)
+    if info:
+        w, h = info.get("width"), info.get("height")
+        if isinstance(w, (int, float)) and isinstance(h, (int, float)) and w > 0 and h > 0:
+            edges.append(int(min(w, h)))
+        elif isinstance(h, (int, float)) and h > 0:
+            edges.append(int(h))
+    return edges
+
+
 def _best_quality_label(raw_formats: list, info: dict | None = None) -> str:
-    """根据可用流计算最佳画质档位的具体分辨率文案。"""
-    heights = [
-        f.get("height")
-        for f in raw_formats
-        if f.get("height") and f.get("vcodec") not in (None, "none")
-    ]
-    if not heights and info:
-        info_height = info.get("height")
-        if isinstance(info_height, (int, float)) and info_height > 0:
-            heights = [int(info_height)]
-    if not heights:
+    """根据可用流计算最佳画质档位的具体分辨率文案（短边像素）。"""
+    edges = _collect_short_edge_heights(raw_formats, info)
+    if not edges:
         return "最佳画质"
-    max_height = max(heights)
+    max_edge = max(edges)
     for std in STANDARD_HEIGHTS:
-        if max_height >= std:
+        if max_edge >= std:
             if std == 2160:
                 return "最佳画质 4K"
             return f"最佳画质 {std}p"
-    return f"最佳画质 {max_height}p"
+    return f"最佳画质 {max_edge}p"
 
 
 def extract_info(url: str) -> InfoResponse:
@@ -302,21 +328,26 @@ def extract_info(url: str) -> InfoResponse:
 
     raw_formats = info.get("formats", []) or []
 
-    # 统计每个标准高度可达到的最大码率对应的预估大小
+    # 统计每个标准清晰度档位（按短边像素，兼容横屏/竖屏）
     available_heights: dict[int, int] = {}
-    for f in raw_formats:
-        height = f.get("height")
-        if not height or f.get("vcodec") in (None, "none"):
-            continue
-        size = f.get("filesize") or f.get("filesize_approx") or 0
+    short_edges = _collect_short_edge_heights(raw_formats, info)
+    if short_edges:
+        max_edge = max(short_edges)
+        size_by_edge: dict[int, int] = {}
+        for f in raw_formats:
+            edge = _format_short_edge(f)
+            if edge is None or f.get("vcodec") in (None, "none"):
+                continue
+            size = f.get("filesize") or f.get("filesize_approx") or 0
+            if size > size_by_edge.get(edge, 0):
+                size_by_edge[edge] = size
         for std in STANDARD_HEIGHTS:
-            if height >= std:
-                # 记录该档位下较大的预估体积
-                if size and size > available_heights.get(std, 0):
-                    available_heights[std] = size
-                else:
-                    available_heights.setdefault(std, 0)
-                break
+            if max_edge >= std:
+                best_size = max(
+                    (sz for edge, sz in size_by_edge.items() if edge >= std),
+                    default=0,
+                )
+                available_heights[std] = best_size
 
     formats: list[FormatOption] = []
     # 最佳画质优先展示，标注具体分辨率
@@ -376,7 +407,9 @@ def _format_selector(quality: str) -> str:
     塞进 MP4 导致播放器兼容问题），不可用时回退到任意编码。
     """
     if quality == "best":
+        # 最佳画质优先最高分辨率，再尽量选 h264+aac 兼容组合
         return (
+            "bestvideo+bestaudio/"
             "bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]/"
             "bestvideo[vcodec^=avc1]+bestaudio/"
             "bestvideo+bestaudio/best"

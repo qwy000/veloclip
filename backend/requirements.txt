@@ -4,3 +4,5 @@ yt-dlp>=2026.6.9
 imageio-ffmpeg==0.5.1
 curl_cffi>=0.7.0
 pydantic==2.10.4
+httpx==0.28.1
+python-dotenv==1.0.1

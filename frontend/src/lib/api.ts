@@ -90,3 +90,60 @@ export function formatDuration(seconds?: number | null): string {
   const pad = (x: number) => x.toString().padStart(2, "0");
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
+
+/* ------------------------------------------------------------------ */
+/*  AI Analysis                                                        */
+/* ------------------------------------------------------------------ */
+
+export interface TranscriptSegment {
+  start: number;
+  end: number;
+  text: string;
+}
+
+export interface AiAnalyzeResult {
+  title: string;
+  language?: string | null;
+  segments: TranscriptSegment[];
+  full_text: string;
+  summary: string;
+  mindmap: string;
+  truncated: boolean;
+  subtitle_source?: string | null;
+}
+
+export interface AiChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export async function fetchAiAnalyze(url: string): Promise<AiAnalyzeResult> {
+  const res = await fetch("/api/ai/analyze", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function fetchAiChat(
+  url: string,
+  question: string,
+  transcriptText: string,
+  history: AiChatMessage[] = [],
+): Promise<string> {
+  const res = await fetch("/api/ai/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      url,
+      question,
+      transcript_text: transcriptText,
+      history,
+    }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  const data = await res.json();
+  return data.answer as string;
+}

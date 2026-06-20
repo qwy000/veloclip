@@ -11,9 +11,12 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from dotenv import load_dotenv
 
-BILI_TEST_URL = "https://www.bilibili.com/video/BV1xx411c7mD"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+
+BILI_TEST_URL = "https://www.bilibili.com/video/BV1awjw6qEog"
 
 
 def test_transcript(url: str = BILI_TEST_URL) -> bool:

@@ -10,6 +10,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from yt_dlp import YoutubeDL
+from yt_dlp.utils import DownloadError
 
 from app.services.downloader import _base_opts, resolve_video_url
 
@@ -147,15 +148,40 @@ def _parse_subtitle_file(path: Path) -> list[TranscriptSegment]:
     return _parse_vtt(content)
 
 
-def _segments_to_text(segments: list[TranscriptSegment]) -> str:
-    return "\n".join(seg.text for seg in segments)
+def _is_bilibili(url: str) -> bool:
+    host = urlparse(url).netloc.lower()
+    return "bilibili.com" in host or host.endswith(".b23.tv") or host == "b23.tv"
 
 
-def _pick_subtitle_lang(info: dict) -> tuple[str | None, str]:
-    """优先 CC/自动字幕，B 站无 CC 时兜底弹幕。返回 (语言代码, 来源类型)。"""
+def _is_douyin(url: str) -> bool:
+    host = urlparse(url).netloc.lower()
+    return "douyin.com" in host or host in ("v.douyin.com", "iesdouyin.com")
+
+
+def _subtitle_opts(url: str, tmp: Path) -> dict:
+    """字幕下载专用 yt-dlp 选项：固定短路径、仅拉字幕、不调用 ffmpeg。"""
+    base = dict(_base_opts(url))
+    # 字幕提取不需要 ffmpeg；旧版 imageio-ffmpeg 在 Windows 转码字幕时会触发 Errno 22
+    base.pop("ffmpeg_location", None)
+    stem = str(tmp / "video")
+    return {
+        **base,
+        "skip_download": True,
+        "windowsfilenames": True,
+        "restrictfilenames": True,
+        "trim_file_name": 80,
+        "outtmpl": {"default": stem, "subtitle": stem},
+    }
+
+
+def _pick_subtitle_lang(info: dict, *, video_url: str) -> tuple[str | None, str]:
+    """优先 CC/自动字幕；B 站 AI 分析优先弹幕（免登录、无 ffmpeg 转码风险）。"""
     manual = info.get("subtitles") or {}
     auto = info.get("automatic_captions") or {}
     cc_manual = {k: v for k, v in manual.items() if k != DANMAKU_LANG}
+
+    if _is_bilibili(video_url) and DANMAKU_LANG in manual:
+        return DANMAKU_LANG, "danmaku"
 
     for lang in PREFERRED_LANGS:
         if lang in cc_manual:
@@ -172,60 +198,106 @@ def _pick_subtitle_lang(info: dict) -> tuple[str | None, str]:
     return None, ""
 
 
-def _is_bilibili(url: str) -> bool:
-    host = urlparse(url).netloc.lower()
-    return "bilibili.com" in host or host.endswith(".b23.tv") or host == "b23.tv"
+def _no_subtitle_error(url: str) -> str:
+    if _is_douyin(url):
+        return (
+            "抖音公开接口未返回可下载的字幕轨，无法进行 AI 分析。"
+            "播放器中显示的字幕可能是烧录在画面里的硬字幕。"
+            "请尝试 B 站等提供 CC 字幕的视频。"
+        )
+    return "该视频暂无可用字幕，无法进行 AI 分析。请尝试带官方字幕的视频。"
+
+
+def _subtitle_write_error(exc: BaseException, url: str) -> str:
+    msg = str(exc).lower()
+    if "errno 22" in msg or "invalid argument" in msg:
+        return (
+            "字幕文件写入失败（Windows 路径或 ffmpeg 兼容性问题）。"
+            "请稍后重试或更换视频。"
+        )
+    if _is_douyin(url):
+        return _no_subtitle_error(url)
+    return str(exc)
+
+
+def _download_subtitle_files(
+    video_url: str, info: dict, lang: str, *, is_danmaku: bool, tmp: Path
+) -> list[Path]:
+    """下载字幕到临时目录，失败时 B 站回退弹幕。"""
+    allowed_suffixes = (".vtt", ".srt", ".ass", ".xml")
+    langs_to_try: list[tuple[str, bool]] = [(lang, is_danmaku)]
+    if _is_bilibili(video_url) and not is_danmaku and DANMAKU_LANG in (info.get("subtitles") or {}):
+        langs_to_try.append((DANMAKU_LANG, True))
+
+    last_exc: BaseException | None = None
+    for try_lang, try_danmaku in langs_to_try:
+        formats = ["xml"] if try_danmaku else ["srt", "vtt", "best"]
+        for sub_fmt in formats:
+            dl_opts = {
+                **_subtitle_opts(video_url, tmp),
+                "writesubtitles": try_lang in (info.get("subtitles") or {}),
+                "writeautomaticsub": try_lang in (info.get("automatic_captions") or {}),
+                "subtitleslangs": [try_lang],
+                "subtitlesformat": sub_fmt,
+            }
+            if try_lang in (info.get("automatic_captions") or {}):
+                dl_opts["writeautomaticsub"] = True
+            if try_lang in (info.get("subtitles") or {}):
+                dl_opts["writesubtitles"] = True
+            try:
+                with YoutubeDL(dl_opts) as ydl:
+                    ydl.extract_info(video_url, download=True)
+                sub_files = sorted(
+                    [p for p in tmp.glob("video.*") if p.suffix.lower() in allowed_suffixes],
+                    key=lambda p: p.stat().st_size,
+                    reverse=True,
+                )
+                if sub_files:
+                    return sub_files
+            except (OSError, RuntimeError, DownloadError) as exc:
+                last_exc = exc
+                for p in tmp.glob("video.*"):
+                    p.unlink(missing_ok=True)
+
+    if last_exc:
+        raise RuntimeError(_subtitle_write_error(last_exc, video_url)) from last_exc
+    return []
 
 
 def extract_transcript(url: str) -> TranscriptResult:
     """提取字幕，返回标题、语言、分段及来源类型。"""
     video_url, _ = resolve_video_url(url)
-    tmp = Path(tempfile.mkdtemp(prefix="veloclip_sub_"))
+    tmp = Path(tempfile.mkdtemp(prefix="vcsub_"))
     try:
-        probe_opts = {**_base_opts(video_url), "skip_download": True, "listsubtitles": True}
-        with YoutubeDL(probe_opts) as ydl:
-            info = ydl.extract_info(video_url, download=False)
-            if info.get("_type") == "playlist" and info.get("entries"):
-                info = info["entries"][0]
+        probe_opts = {**_subtitle_opts(video_url, tmp), "listsubtitles": True}
+        try:
+            with YoutubeDL(probe_opts) as ydl:
+                info = ydl.extract_info(video_url, download=False)
+                if info.get("_type") == "playlist" and info.get("entries"):
+                    info = info["entries"][0]
+        except (OSError, DownloadError) as exc:
+            raise RuntimeError(_subtitle_write_error(exc, video_url)) from exc
 
-        lang, source = _pick_subtitle_lang(info)
+        lang, source = _pick_subtitle_lang(info, video_url=video_url)
         if not lang:
-            raise RuntimeError("该视频暂无可用字幕，无法进行 AI 分析。请尝试带官方字幕的视频。")
+            raise RuntimeError(_no_subtitle_error(video_url))
 
         is_danmaku = lang == DANMAKU_LANG
-        dl_opts = {
-            **_base_opts(video_url),
-            "skip_download": True,
-            "writesubtitles": lang in (info.get("subtitles") or {}),
-            "writeautomaticsub": lang in (info.get("automatic_captions") or {}),
-            "subtitleslangs": [lang],
-            "subtitlesformat": "xml" if is_danmaku else "vtt/srt/best",
-            "outtmpl": str(tmp / "video"),
-        }
-        if lang in (info.get("automatic_captions") or {}):
-            dl_opts["writeautomaticsub"] = True
-        if lang in (info.get("subtitles") or {}):
-            dl_opts["writesubtitles"] = True
-
-        with YoutubeDL(dl_opts) as ydl:
-            ydl.extract_info(video_url, download=True)
-
-        allowed_suffixes = (".vtt", ".srt", ".ass", ".xml")
-        sub_files = sorted(
-            [p for p in tmp.glob("video.*") if p.suffix.lower() in allowed_suffixes],
-            key=lambda p: p.stat().st_size,
-            reverse=True,
+        sub_files = _download_subtitle_files(
+            video_url, info, lang, is_danmaku=is_danmaku, tmp=tmp
         )
         if not sub_files:
-            raise RuntimeError("该视频暂无可用字幕，无法进行 AI 分析。请尝试带官方字幕的视频。")
+            raise RuntimeError(_no_subtitle_error(video_url))
 
         segments = _parse_subtitle_file(sub_files[0])
         if not segments:
             raise RuntimeError("字幕文件解析失败，请更换视频链接后重试。")
 
-        title = info.get("title") or "未命名视频"
-        if is_danmaku and _is_bilibili(video_url):
+        if sub_files[0].suffix.lower() == ".xml" and _is_bilibili(video_url):
             source = "danmaku"
+            lang = DANMAKU_LANG
+
+        title = info.get("title") or "未命名视频"
         return TranscriptResult(title=title, language=lang, segments=segments, source=source)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

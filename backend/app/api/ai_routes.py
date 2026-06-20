@@ -85,8 +85,13 @@ def _friendly_ai_error(message: str) -> str:
     msg = message.lower()
     if "deepseek_api_key" in msg or "未配置 deepseek" in message.lower():
         return "未配置 DeepSeek API Key，请在 backend/.env 中设置 DEEPSEEK_API_KEY。"
-    if "暂无可用字幕" in message or "no subtitles" in msg:
-        return "该视频暂无可用字幕，无法进行 AI 分析。请尝试带官方字幕的视频。"
+    if "暂无可用字幕" in message or "抖音公开接口" in message or "no subtitles" in msg:
+        return message
+    if "errno 22" in msg or "invalid argument" in msg or "字幕文件写入失败" in message:
+        return (
+            "字幕文件写入失败（Windows 路径或 ffmpeg 兼容性问题）。"
+            "请稍后重试或更换视频。"
+        )
     if "401" in message or "authentication" in msg or "invalid api key" in msg:
         return "DeepSeek API Key 无效或已过期，请检查 backend/.env 中的 DEEPSEEK_API_KEY。"
     if "402" in message or "insufficient" in msg or "balance" in msg:

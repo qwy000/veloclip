@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   AlertCircle,
   Brain,
@@ -42,6 +42,7 @@ export default function AiAnalysisPanel({ url, videoTitle }: AiAnalysisPanelProp
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AiAnalyzeResult | null>(null);
   const [tab, setTab] = useState<Tab>("summary");
+  const preserveScrollY = useRef<number | null>(null);
 
   useEffect(() => {
     setPhase("idle");
@@ -68,6 +69,18 @@ export default function AiAnalysisPanel({ url, videoTitle }: AiAnalysisPanelProp
   }
 
   const analyzing = phase === "analyzing";
+
+  useLayoutEffect(() => {
+    if (preserveScrollY.current !== null) {
+      window.scrollTo(0, preserveScrollY.current);
+      preserveScrollY.current = null;
+    }
+  }, [tab]);
+
+  function handleTabChange(next: Tab) {
+    preserveScrollY.current = window.scrollY;
+    setTab(next);
+  }
 
   return (
     <div className="mt-5 border-t border-slate-200 pt-5">
@@ -138,7 +151,8 @@ export default function AiAnalysisPanel({ url, videoTitle }: AiAnalysisPanelProp
               <button
                 key={id}
                 type="button"
-                onClick={() => setTab(id)}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleTabChange(id)}
                 className={`inline-flex items-center gap-1.5 rounded-t-lg px-3 py-2 text-sm font-medium transition ${
                   tab === id
                     ? "bg-white text-brand shadow-sm ring-1 ring-slate-100"
@@ -304,26 +318,28 @@ function MindMapView({ markdown, title }: { markdown: string; title: string }) {
   }
 
   async function handleExportPng() {
-    if (!canvasRef.current || exporting) return;
+    if (!canvasRef.current || !containerRef.current || exporting) return;
     setExporting(true);
-    let wrapper: HTMLDivElement | null = null;
+    const node = canvasRef.current;
+    const container = containerRef.current;
+    const prevNodeTransform = node.style.transform;
+    const prevNodeTransition = node.style.transition;
+    const prevContainerOverflow = container.style.overflow;
     try {
-      // 离屏克隆并去掉 transform，避免 html-to-image 量算行高错误导致边框压字
-      wrapper = document.createElement("div");
-      wrapper.style.cssText =
-        "position:fixed;left:-10000px;top:0;z-index:-1;background:#f8fafc;padding:32px;";
-      const clone = canvasRef.current.cloneNode(true) as HTMLDivElement;
-      clone.style.transform = "none";
-      clone.style.transition = "none";
-      wrapper.appendChild(clone);
-      document.body.appendChild(wrapper);
+      node.style.transform = "none";
+      node.style.transition = "none";
+      container.style.overflow = "visible";
+
       await new Promise<void>((resolve) => {
         requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
       });
-      const dataUrl = await toPng(wrapper, {
+
+      const dataUrl = await toPng(node, {
         backgroundColor: "#f8fafc",
         pixelRatio: 2,
         cacheBust: true,
+        width: node.scrollWidth,
+        height: node.scrollHeight,
       });
       const a = document.createElement("a");
       a.href = dataUrl;
@@ -332,7 +348,9 @@ function MindMapView({ markdown, title }: { markdown: string; title: string }) {
     } catch {
       /* export failed */
     } finally {
-      if (wrapper?.parentNode) wrapper.parentNode.removeChild(wrapper);
+      node.style.transform = prevNodeTransform;
+      node.style.transition = prevNodeTransition;
+      container.style.overflow = prevContainerOverflow;
       setExporting(false);
     }
   }
@@ -340,7 +358,7 @@ function MindMapView({ markdown, title }: { markdown: string; title: string }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-left text-xs text-ink-muted">滚轮缩放 · 拖拽平移</p>
+        <p className="text-left text-xs text-ink-muted">滚轮缩放 · 拖拽平移 · 滚动条浏览</p>
         <div className="flex flex-wrap items-center gap-1">
           <button
             type="button"
@@ -350,6 +368,17 @@ function MindMapView({ markdown, title }: { markdown: string; title: string }) {
           >
             <ZoomOut className="h-4 w-4" />
           </button>
+          <input
+            type="range"
+            min={35}
+            max={250}
+            step={5}
+            value={Math.round(scale * 100)}
+            onChange={(e) => setScale(clampScale(Number(e.target.value) / 100))}
+            className="h-1.5 w-24 cursor-pointer accent-brand"
+            title="缩放比例"
+            aria-label="思维导图缩放"
+          />
           <span className="min-w-[3rem] text-center text-xs tabular-nums text-ink-muted">
             {Math.round(scale * 100)}%
           </span>
@@ -387,7 +416,7 @@ function MindMapView({ markdown, title }: { markdown: string; title: string }) {
 
       <div
         ref={containerRef}
-        className={`relative h-[360px] overflow-hidden rounded-xl border border-slate-100 bg-gradient-to-br from-slate-50 to-brand-50/30 ${
+        className={`relative h-[360px] overflow-auto rounded-xl border border-slate-100 bg-gradient-to-br from-slate-50 to-brand-50/30 ${
           dragging ? "cursor-grabbing" : "cursor-grab"
         }`}
         onWheel={handleWheel}
@@ -476,7 +505,7 @@ function ChatPanel({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMessages([]);
@@ -485,7 +514,10 @@ function ChatPanel({
   }, [url]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length === 0 && !loading) return;
+    const el = chatScrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
   }, [messages, loading]);
 
   async function handleSend() {
@@ -521,7 +553,10 @@ function ChatPanel({
         基于「{title}」字幕内容提问，AI 将结合视频上下文回答
       </p>
 
-      <div className="flex-1 space-y-3 overflow-y-auto rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+      <div
+        ref={chatScrollRef}
+        className="flex-1 space-y-3 overflow-y-auto rounded-xl border border-slate-100 bg-slate-50/50 p-4"
+      >
         {messages.length === 0 && (
           <div className="space-y-2">
             <p className="text-sm text-ink-muted">试试这些问题：</p>
@@ -556,7 +591,6 @@ function ChatPanel({
             思考中…
           </div>
         )}
-        <div ref={bottomRef} />
       </div>
 
       {chatError && <p className="mt-2 text-left text-xs text-red-500">{chatError}</p>}

@@ -67,7 +67,7 @@ class AiAnalyzeResponse(BaseModel):
     mindmap: str
     truncated: bool = False
     subtitle_source: Optional[str] = Field(
-        default=None, description="cc | auto | danmaku"
+        default=None, description="cc | auto | danmaku | metadata"
     )
 
 
@@ -81,6 +81,9 @@ class AiChatRequest(BaseModel):
     question: str = Field(..., description="用户问题")
     transcript_text: Optional[str] = Field(
         default=None, description="已提取的字幕全文，传入可避免重复拉取"
+    )
+    subtitle_source: Optional[str] = Field(
+        default=None, description="cc | auto | danmaku | metadata，与 transcript_text 配套"
     )
     history: list[AiChatMessage] = Field(default_factory=list)
 

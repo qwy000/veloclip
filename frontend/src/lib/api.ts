@@ -132,6 +132,7 @@ export async function fetchAiChat(
   question: string,
   transcriptText: string,
   history: AiChatMessage[] = [],
+  subtitleSource?: string | null,
 ): Promise<string> {
   const res = await fetch("/api/ai/chat", {
     method: "POST",
@@ -140,6 +141,7 @@ export async function fetchAiChat(
       url,
       question,
       transcript_text: transcriptText,
+      subtitle_source: subtitleSource ?? undefined,
       history,
     }),
   });

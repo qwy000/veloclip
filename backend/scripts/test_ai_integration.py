@@ -28,9 +28,20 @@ def test_transcript(url: str = BILI_TEST_URL) -> bool:
     print(f"  lang: {result.language}  source: {result.source}  segments: {len(result.segments)}")
     if result.segments:
         s = result.segments[0]
-        print(f"  first: [{s.start:.1f}s] {s.text[:50]}")
+        print(f"  first: [{s.start:.1f}s] {s.text[:80]}")
     ok = len(result.segments) > 0
     print("  PASS" if ok else "  FAIL")
+    return ok
+
+
+def test_metadata_fallback(url: str) -> bool:
+    from app.services.transcript import extract_for_analysis
+
+    print(f"[metadata-fallback] {url}")
+    result = extract_for_analysis(url)
+    ok = result.source == "metadata" and len(result.segments) > 0
+    print(f"  source={result.source} segments={len(result.segments)}")
+    print("  PASS" if ok else "  FAIL (may need URL without subtitles)")
     return ok
 
 
@@ -77,10 +88,13 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--analyze", action="store_true", help="含 DeepSeek 完整分析")
     parser.add_argument("--http", action="store_true", help="通过 HTTP API 测试")
+    parser.add_argument("--metadata", action="store_true", help="测试无字幕元数据降级")
     parser.add_argument("--url", default=BILI_TEST_URL)
     args = parser.parse_args()
 
     ok = test_transcript(args.url)
+    if args.metadata:
+        ok = test_metadata_fallback(args.url) and ok
     if args.http:
         ok = test_http(url=args.url) and ok
     if args.analyze:

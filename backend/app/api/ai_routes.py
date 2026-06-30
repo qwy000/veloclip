@@ -74,6 +74,7 @@ def chat_about_video(req: AiChatRequest) -> AiChatResponse:
             url=url,
             question=question,
             transcript_text=req.transcript_text,
+            subtitle_source=req.subtitle_source,
             history=[{"role": m.role, "content": m.content} for m in req.history],
         )
     except Exception as exc:  # noqa: BLE001

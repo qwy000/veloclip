@@ -2,12 +2,14 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   AlertCircle,
   Brain,
+  Expand,
   GitBranch,
   ImageDown,
   Loader2,
   Maximize2,
   MessageCircle,
   Send,
+  Shrink,
   Sparkles,
   Subtitles,
   ZoomIn,
@@ -136,10 +138,11 @@ export default function AiAnalysisPanel({ url, videoTitle }: AiAnalysisPanelProp
         <div className="mt-4 overflow-hidden rounded-xl border border-slate-100 bg-white">
           <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3">
             <p className="text-left text-xs text-ink-muted">
-              {result.language ? `字幕语言：${result.language}` : "已提取字幕"}
+              {result.language ? `字幕语言：${result.language}` : result.subtitle_source === "metadata" ? "无字幕" : "已提取字幕"}
               {result.subtitle_source === "danmaku" && " · B 站弹幕（非官方 CC）"}
               {result.subtitle_source === "cc" && " · 官方字幕"}
               {result.subtitle_source === "auto" && " · 自动生成字幕"}
+              {result.subtitle_source === "metadata" && " · 无字幕（元数据分析）"}
               {result.truncated ? " · 字幕较长，已截取前半部分" : ""}
               {" · "}
               共 {result.segments.length} 条
@@ -172,7 +175,12 @@ export default function AiAnalysisPanel({ url, videoTitle }: AiAnalysisPanelProp
             )}
             {tab === "transcript" && <TranscriptView segments={result.segments} />}
             {tab === "chat" && (
-              <ChatPanel url={url.trim()} transcriptText={result.full_text} title={result.title || videoTitle || ""} />
+              <ChatPanel
+                url={url.trim()}
+                transcriptText={result.full_text}
+                subtitleSource={result.subtitle_source}
+                title={result.title || videoTitle || ""}
+              />
             )}
           </div>
         </div>
@@ -281,6 +289,7 @@ function parseMarkdownOutline(md: string): TreeNode {
 
 function MindMapView({ markdown, title }: { markdown: string; title: string }) {
   const tree = parseMarkdownOutline(markdown);
+  const fullscreenRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -288,8 +297,31 @@ function MindMapView({ markdown, title }: { markdown: string; title: string }) {
   const [dragging, setDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const [exporting, setExporting] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const clampScale = (v: number) => Math.min(2.5, Math.max(0.35, v));
+
+  useEffect(() => {
+    function syncFullscreen() {
+      setIsFullscreen(document.fullscreenElement === fullscreenRef.current);
+    }
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+  }, []);
+
+  async function toggleFullscreen() {
+    const el = fullscreenRef.current;
+    if (!el) return;
+    try {
+      if (document.fullscreenElement === el) {
+        await document.exitFullscreen();
+      } else {
+        await el.requestFullscreen();
+      }
+    } catch {
+      /* fullscreen not supported or denied */
+    }
+  }
 
   function handleWheel(e: React.WheelEvent) {
     e.preventDefault();
@@ -356,9 +388,14 @@ function MindMapView({ markdown, title }: { markdown: string; title: string }) {
   }
 
   return (
-    <div className="space-y-3">
+    <div
+      ref={fullscreenRef}
+      className={`space-y-3 ${isFullscreen ? "flex h-screen flex-col bg-gradient-to-br from-slate-50 to-brand-50/30 p-4" : ""}`}
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-left text-xs text-ink-muted">滚轮缩放 · 拖拽平移 · 滚动条浏览</p>
+        <p className="text-left text-xs text-ink-muted">
+          滚轮缩放 · 拖拽平移 · 滚动条浏览{isFullscreen ? " · Esc 退出全屏" : ""}
+        </p>
         <div className="flex flex-wrap items-center gap-1">
           <button
             type="button"
@@ -403,6 +440,15 @@ function MindMapView({ markdown, title }: { markdown: string; title: string }) {
           </button>
           <button
             type="button"
+            onClick={toggleFullscreen}
+            className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-ink-muted hover:border-brand-100 hover:text-brand"
+            title={isFullscreen ? "退出全屏" : "全屏展示"}
+          >
+            {isFullscreen ? <Shrink className="h-3.5 w-3.5" /> : <Expand className="h-3.5 w-3.5" />}
+            {isFullscreen ? "退出全屏" : "全屏"}
+          </button>
+          <button
+            type="button"
             onClick={handleExportPng}
             disabled={exporting}
             className="inline-flex h-8 items-center gap-1 rounded-lg border border-brand bg-brand px-2.5 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-60"
@@ -416,9 +462,9 @@ function MindMapView({ markdown, title }: { markdown: string; title: string }) {
 
       <div
         ref={containerRef}
-        className={`relative h-[360px] overflow-auto rounded-xl border border-slate-100 bg-gradient-to-br from-slate-50 to-brand-50/30 ${
-          dragging ? "cursor-grabbing" : "cursor-grab"
-        }`}
+        className={`relative overflow-auto rounded-xl border border-slate-100 bg-gradient-to-br from-slate-50 to-brand-50/30 ${
+          isFullscreen ? "min-h-0 flex-1" : "h-[360px]"
+        } ${dragging ? "cursor-grabbing" : "cursor-grab"}`}
         onWheel={handleWheel}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -495,10 +541,12 @@ function TranscriptView({ segments }: { segments: AiAnalyzeResult["segments"] })
 function ChatPanel({
   url,
   transcriptText,
+  subtitleSource,
   title,
 }: {
   url: string;
   transcriptText: string;
+  subtitleSource?: string | null;
   title: string;
 }) {
   const [messages, setMessages] = useState<AiChatMessage[]>([]);
@@ -530,7 +578,7 @@ function ChatPanel({
     setMessages(nextHistory);
     setLoading(true);
     try {
-      const answer = await fetchAiChat(url, q, transcriptText, messages);
+      const answer = await fetchAiChat(url, q, transcriptText, messages, subtitleSource);
       setMessages([...nextHistory, { role: "assistant", content: answer }]);
     } catch (e) {
       setChatError(e instanceof Error ? e.message : "提问失败");

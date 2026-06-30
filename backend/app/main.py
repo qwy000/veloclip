@@ -33,4 +33,6 @@ app.include_router(ai_router)
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok"}
+    import os
+
+    return {"status": "ok", "pid": os.getpid()}

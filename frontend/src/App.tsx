@@ -38,8 +38,8 @@ const FEATURES = [
   },
   {
     icon: ShieldCheck,
-    title: "高清无水印",
-    desc: "自动匹配最高画质，去除平台水印，下载到的就是干净的原片。",
+    title: "高清画质",
+    desc: "自动匹配可用最高清晰度，支持 1080p / 4K 等档位，按需选择仅音频 MP3。",
   },
   {
     icon: Zap,
@@ -75,8 +75,9 @@ const PLANS = [
     price: "¥0",
     period: "/ 永久",
     desc: "适合偶尔下载的轻度用户",
-    features: ["每日 5 次下载", "最高 720P 画质", "标准解析速度", "全平台支持"],
+    features: ["每日 5 次下载*", "最高 720P 画质*", "标准解析速度", "全平台支持"],
     cta: "免费开始",
+    ctaHref: "#download",
     highlight: false,
   },
   {
@@ -92,6 +93,7 @@ const PLANS = [
       "无广告纯净体验",
     ],
     cta: "升级 Pro",
+    ctaHref: "#download",
     highlight: true,
   },
   {
@@ -101,6 +103,7 @@ const PLANS = [
     desc: "重度用户与团队的超值之选",
     features: ["Pro 全部权益", "全年立省 40%", "AI 字幕翻译（即将上线）", "视频智能总结 · 思维导图", "专属客服支持"],
     cta: "立省 40%",
+    ctaHref: "#download",
     highlight: false,
   },
 ];
@@ -112,7 +115,7 @@ const FAQS = [
   },
   {
     q: "下载的视频有水印吗？",
-    a: "对于支持无水印源的平台，我们会自动获取无水印的原始视频；并默认匹配可用的最高清晰度。",
+    a: "取决于来源平台与视频本身。我们会尽量获取平台提供的最高可用清晰度；部分平台可能仍带水印或为硬字幕，请以实际解析结果为准。",
   },
   {
     q: "需要安装软件吗？",
@@ -215,7 +218,7 @@ function Navbar() {
 
 function Hero() {
   return (
-    <section className="hero-gradient relative overflow-hidden pb-16 pt-14 sm:pt-20">
+    <section id="download" className="hero-gradient relative overflow-hidden pb-16 pt-14 sm:pt-20 scroll-mt-16">
       <div className="section relative text-center">
         <div className="mx-auto inline-flex">
           <span className="eyebrow">
@@ -229,7 +232,7 @@ function Hero() {
           </span>
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-base text-ink-muted sm:text-lg">
-          全平台 · 高清无水印 · 手机电脑随时随地。粘贴链接，三秒解析，极速保存你想要的每一段视频。
+          全平台 · 高清多档位 · 手机电脑随时随地。粘贴链接，快速解析，保存你想要的视频。
         </p>
 
         <div className="mt-9">
@@ -237,7 +240,7 @@ function Hero() {
         </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-ink-muted">
-          {["免费试用", "无需安装", "无水印", "支持批量"].map((t) => (
+          {["免费使用", "无需安装", "多平台", "AI 分析"].map((t) => (
             <span key={t} className="inline-flex items-center gap-1.5">
               <Check className="h-4 w-4 text-brand" /> {t}
             </span>
@@ -329,54 +332,55 @@ function Features() {
 
 function Pricing() {
   return (
-    <section id="pricing" className="py-20">
-      <div className="section max-w-5xl">
+    <section id="pricing" className="py-16">
+      <div className="section max-w-6xl">
         <SectionTitle
           eyebrow="会员定价"
           title="选择适合你的方案"
-          subtitle="免费即可上手，升级 Pro 解锁无限次下载与 4K 超清，效率翻倍。"
+          subtitle="免费即可上手；Pro / 旗舰为产品规划展示，当前版本下载与 AI 分析均可免费体验。"
         />
-        <div className="mt-12 grid items-stretch gap-4 md:grid-cols-3 md:gap-5">
+        <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
           {PLANS.map((p) => (
             <div
               key={p.name}
-              className={`relative flex flex-col rounded-2xl p-5 transition-all duration-200 md:p-6 ${
+              className={`relative flex min-w-0 flex-col rounded-xl p-4 transition-all duration-200 sm:p-5 ${
                 p.highlight
                   ? "border-2 border-brand bg-white shadow-cardHover"
-                  : "card hover:-translate-y-1 hover:shadow-cardHover"
+                  : "card hover:shadow-cardHover"
               }`}
             >
               {p.highlight && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-brand to-[#6D5DFB] px-4 py-1 text-xs font-semibold text-white shadow-glow">
+                <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-gradient-to-r from-brand to-[#6D5DFB] px-3 py-0.5 text-[10px] font-semibold text-white shadow-glow">
                   最受欢迎
                 </span>
               )}
-              <h3 className="text-lg font-bold text-ink">{p.name}</h3>
-              <p className="mt-1 text-sm text-ink-muted">{p.desc}</p>
-              <div className="mt-5 flex items-end gap-1">
-                <span className="text-4xl font-extrabold text-ink">{p.price}</span>
-                <span className="mb-1 text-sm text-ink-muted">{p.period}</span>
+              <h3 className="text-base font-bold text-ink">{p.name}</h3>
+              <p className="mt-0.5 line-clamp-2 text-xs text-ink-muted">{p.desc}</p>
+              <div className="mt-3 flex items-end gap-1">
+                <span className="text-2xl font-extrabold text-ink sm:text-3xl">{p.price}</span>
+                <span className="mb-0.5 text-xs text-ink-muted">{p.period}</span>
               </div>
-              <ul className="mt-6 w-full flex-1 space-y-2 text-sm">
+              <ul className="mt-4 flex-1 space-y-1.5 text-xs sm:text-sm">
                 {p.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-ink">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
-                    {f}
+                  <li key={f} className="flex items-start gap-1.5 text-ink">
+                    <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" />
+                    <span className="leading-snug">{f}</span>
                   </li>
                 ))}
               </ul>
-              <button
-                className={`mt-8 h-12 w-full text-base ${
+              <a
+                href={p.ctaHref}
+                className={`mt-5 flex h-9 w-full items-center justify-center text-sm sm:h-10 ${
                   p.highlight ? "btn-primary" : "btn-ghost"
                 }`}
               >
                 {p.cta}
-              </button>
+              </a>
             </div>
           ))}
         </div>
-        <p className="mt-6 text-center text-xs text-slate-400">
-          * 定价与会员权益为产品规划展示，当前版本下载功能完全免费开放体验。
+        <p className="mt-4 text-center text-xs leading-relaxed text-slate-400">
+          * 定价与会员权益为产品规划展示；标 * 项尚未接入限流，当前版本下载功能完全免费开放体验。
         </p>
       </div>
     </section>
@@ -431,7 +435,7 @@ function CTA() {
             无需注册、无需安装，粘贴链接即可开始。把每一个精彩瞬间留在本地。
           </p>
           <a
-            href="#top"
+            href="#download"
             className="btn-pill relative mt-8 h-12 bg-white px-8 text-base font-semibold text-brand hover:-translate-y-0.5"
           >
             <Download className="h-5 w-5" /> 立即免费下载
@@ -449,7 +453,7 @@ function Footer() {
         <div className="flex flex-col items-center justify-between gap-6 sm:flex-row">
           <Logo />
           <p className="text-sm text-ink-muted">
-            {SITE_NAME} · 全平台 · 高清 · 无水印
+            {SITE_NAME} · 全平台 · 高清多档位
           </p>
         </div>
         <div className="mt-8 rounded-xl bg-slate-50 px-5 py-4 text-center text-xs leading-relaxed text-slate-400">

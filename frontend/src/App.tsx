@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Download,
   Zap,
@@ -14,8 +14,15 @@ import {
   Youtube,
   Music2,
   Play,
+  Loader2,
+  LogOut,
+  User,
 } from "lucide-react";
 import Downloader from "./components/Downloader";
+import AuthModal from "./components/AuthModal";
+import BackendHealthBanner from "./components/BackendHealthBanner";
+import { useAuth } from "./context/AuthContext";
+import { createCheckout, createPortal, fetchBillingPlans, type BillingPlan, type MembershipInfo } from "./lib/auth";
 
 const SITE_NAME = "VeloClip";
 
@@ -69,18 +76,19 @@ const STEPS = [
   { num: "03", title: "选清晰度下载", desc: "选择画质，点击下载，文件直达你的设备。" },
 ];
 
-const PLANS = [
+const PLANS_STATIC = [
   {
+    id: "free",
     name: "免费版",
     price: "¥0",
     period: "/ 永久",
     desc: "适合偶尔下载的轻度用户",
     features: ["每日 5 次下载*", "最高 720P 画质*", "标准解析速度", "全平台支持"],
     cta: "免费开始",
-    ctaHref: "#download",
     highlight: false,
   },
   {
+    id: "pro",
     name: "Pro 会员",
     price: "¥19",
     period: "/ 月",
@@ -93,20 +101,49 @@ const PLANS = [
       "无广告纯净体验",
     ],
     cta: "升级 Pro",
-    ctaHref: "#download",
     highlight: true,
   },
   {
+    id: "ultimate",
     name: "旗舰版",
     price: "¥149",
-    period: "/ 年",
+    period: "/ 12 个月",
     desc: "重度用户与团队的超值之选",
-    features: ["Pro 全部权益", "全年立省 40%", "AI 字幕翻译（即将上线）", "视频智能总结 · 思维导图", "专属客服支持"],
-    cta: "立省 40%",
-    ctaHref: "#download",
+    features: ["Pro 全部权益", "一次性购买 12 个月", "AI 字幕翻译（即将上线）", "视频智能总结 · 思维导图", "专属客服支持"],
+    cta: "购买旗舰版",
     highlight: false,
   },
 ];
+
+const PLAN_RANK: Record<string, number> = { free: 0, pro: 1, ultimate: 2 };
+
+function paidPlanAction(
+  planId: "pro" | "ultimate",
+  membership: MembershipInfo | undefined,
+  cta: string,
+): { label: string; disabled: boolean; isCurrent: boolean } {
+  if (!membership?.is_premium) {
+    return { label: cta, disabled: false, isCurrent: false };
+  }
+  const currentRank = PLAN_RANK[membership.plan] ?? 0;
+  const targetRank = PLAN_RANK[planId] ?? 0;
+  if (membership.plan === planId) {
+    return { label: "当前方案", disabled: true, isCurrent: true };
+  }
+  if (currentRank > targetRank) {
+    return { label: "已包含更高权益", disabled: true, isCurrent: false };
+  }
+  return { label: cta, disabled: false, isCurrent: false };
+}
+
+async function openBillingPortal(setError?: (msg: string) => void) {
+  try {
+    const { portal_url } = await createPortal();
+    window.location.href = portal_url;
+  } catch (err) {
+    setError?.(err instanceof Error ? err.message : "打开订阅管理失败");
+  }
+}
 
 const FAQS = [
   {
@@ -132,17 +169,46 @@ const FAQS = [
 ];
 
 export default function App() {
+  const [authOpen, setAuthOpen] = useState(false);
+  const [pendingPlan, setPendingPlan] = useState<"pro" | "ultimate" | null>(null);
+
+  const openAuth = (plan?: "pro" | "ultimate") => {
+    if (plan) setPendingPlan(plan);
+    setAuthOpen(true);
+  };
+
+  const handleAuthSuccess = async () => {
+    if (pendingPlan) {
+      try {
+        const { checkout_url } = await createCheckout(pendingPlan);
+        window.location.href = checkout_url;
+      } catch {
+        /* user can retry from pricing */
+      }
+      setPendingPlan(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
-      <Navbar />
+      <BackendHealthBanner />
+      <Navbar onLogin={() => openAuth()} />
       <Hero />
       <Platforms />
       <Steps />
       <Features />
-      <Pricing />
+      <Pricing onUpgrade={(plan) => openAuth(plan)} />
       <FAQ />
       <CTA />
       <Footer />
+      <AuthModal
+        open={authOpen}
+        onClose={() => {
+          setAuthOpen(false);
+          setPendingPlan(null);
+        }}
+        onSuccess={handleAuthSuccess}
+      />
     </div>
   );
 }
@@ -160,8 +226,9 @@ function Logo() {
   );
 }
 
-function Navbar() {
+function Navbar({ onLogin }: { onLogin: () => void }) {
   const [open, setOpen] = useState(false);
+  const { user, logout, loading } = useAuth();
   const links = [
     { label: "功能特性", href: "#features" },
     { label: "使用步骤", href: "#steps" },
@@ -186,9 +253,36 @@ function Navbar() {
             </a>
           ))}
         </div>
-        <div className="hidden md:block">
+        <div className="hidden items-center gap-4 md:flex">
+          {!loading && user ? (
+            <>
+              <span className="inline-flex items-center gap-1.5 text-sm text-ink-muted">
+                <User className="h-4 w-4" />
+                {user.email}
+                <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs text-brand">
+                  {user.membership.plan_label}
+                </span>
+              </span>
+              {user.membership.can_manage_subscription && (
+                <button
+                  type="button"
+                  className="text-sm text-brand hover:underline"
+                  onClick={() => openBillingPortal()}
+                >
+                  管理订阅 / 取消续费
+                </button>
+              )}
+              <button type="button" onClick={logout} className="text-sm text-ink-muted hover:text-ink">
+                <LogOut className="h-4 w-4" />
+              </button>
+            </>
+          ) : (
+            <button type="button" onClick={onLogin} className="text-sm font-medium text-brand">
+              登录 / 注册
+            </button>
+          )}
           <a href="#pricing" className="btn-primary h-10 px-5 text-sm">
-            升级 Pro
+            {user?.membership.is_premium ? "查看会员" : "升级 Pro"}
           </a>
         </div>
         <button className="md:hidden" onClick={() => setOpen((v) => !v)}>
@@ -210,6 +304,11 @@ function Navbar() {
           <a href="#pricing" className="btn-primary mt-2 h-10 w-full text-sm">
             升级 Pro
           </a>
+          {!loading && !user && (
+            <button type="button" onClick={() => { setOpen(false); onLogin(); }} className="mt-2 w-full text-sm text-brand">
+              登录 / 注册
+            </button>
+          )}
         </div>
       )}
     </header>
@@ -330,25 +429,85 @@ function Features() {
   );
 }
 
-function Pricing() {
+function Pricing({ onUpgrade }: { onUpgrade: (plan: "pro" | "ultimate") => void }) {
+  const { user, refreshUser } = useAuth();
+  const [plans, setPlans] = useState<BillingPlan[]>([]);
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetchBillingPlans().then(setPlans).catch(() => {});
+    refreshUser().catch(() => {});
+  }, [refreshUser]);
+
+  const apiPlan = (id: string) => plans.find((p) => p.id === id);
+
+  const handlePurchase = async (planId: "pro" | "ultimate") => {
+    setError("");
+    const action = paidPlanAction(planId, user?.membership, planId === "pro" ? "升级 Pro" : "购买旗舰版");
+    if (action.disabled) return;
+
+    if (!user) {
+      onUpgrade(planId);
+      return;
+    }
+    setCheckoutLoading(planId);
+    try {
+      const { checkout_url } = await createCheckout(planId);
+      window.location.href = checkout_url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "创建支付失败");
+    } finally {
+      setCheckoutLoading(null);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    setError("");
+    setPortalLoading(true);
+    try {
+      await openBillingPortal(setError);
+    } finally {
+      setPortalLoading(false);
+    }
+  };
+
   return (
     <section id="pricing" className="py-16">
       <div className="section max-w-6xl">
         <SectionTitle
           eyebrow="会员定价"
           title="选择适合你的方案"
-          subtitle="免费即可上手；Pro / 旗舰为产品规划展示，当前版本下载与 AI 分析均可免费体验。"
+          subtitle="免费即可上手；Pro 为月订自动续费；旗舰版为一次性购买 12 个月（到期不自动续费）。当前版本下载与 AI 分析仍免费开放体验。"
         />
+        {error && (
+          <p className="mt-4 text-center text-sm text-red-600">{error}</p>
+        )}
         <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-          {PLANS.map((p) => (
+          {PLANS_STATIC.map((p) => {
+            const remote = apiPlan(p.id);
+            const priceDisplay = remote?.price_display ?? p.price;
+            const period = remote ? `/${remote.period}` : p.period;
+            const paidAction =
+              p.id === "pro" || p.id === "ultimate"
+                ? paidPlanAction(p.id, user?.membership, p.cta)
+                : null;
+            const isCurrentPlan = paidAction?.isCurrent ?? false;
+            return (
             <div
-              key={p.name}
+              key={p.id}
               className={`relative flex min-w-0 flex-col rounded-xl p-4 transition-all duration-200 sm:p-5 ${
                 p.highlight
                   ? "border-2 border-brand bg-white shadow-cardHover"
                   : "card hover:shadow-cardHover"
-              }`}
+              } ${isCurrentPlan ? "ring-2 ring-brand/30" : ""}`}
             >
+              {isCurrentPlan && (
+                <span className="absolute -top-2.5 right-3 rounded-full bg-brand px-2.5 py-0.5 text-[10px] font-semibold text-white">
+                  当前方案
+                </span>
+              )}
               {p.highlight && (
                 <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-gradient-to-r from-brand to-[#6D5DFB] px-3 py-0.5 text-[10px] font-semibold text-white shadow-glow">
                   最受欢迎
@@ -357,9 +516,20 @@ function Pricing() {
               <h3 className="text-base font-bold text-ink">{p.name}</h3>
               <p className="mt-0.5 line-clamp-2 text-xs text-ink-muted">{p.desc}</p>
               <div className="mt-3 flex items-end gap-1">
-                <span className="text-2xl font-extrabold text-ink sm:text-3xl">{p.price}</span>
-                <span className="mb-0.5 text-xs text-ink-muted">{p.period}</span>
+                <span className="text-2xl font-extrabold text-ink sm:text-3xl">{priceDisplay}</span>
+                <span className="mb-0.5 text-xs text-ink-muted">{period}</span>
               </div>
+              {remote?.currency_note && (
+                <p className="mt-1 text-[10px] text-slate-400">{remote.currency_note}</p>
+              )}
+              {remote?.renewal_note && (
+                <p className="mt-0.5 text-[10px] text-slate-400">{remote.renewal_note}</p>
+              )}
+              {isCurrentPlan && user?.membership.expires_at && (
+                <p className="mt-2 text-[10px] text-brand">
+                  到期：{new Date(user.membership.expires_at).toLocaleDateString("zh-CN")}
+                </p>
+              )}
               <ul className="mt-4 flex-1 space-y-1.5 text-xs sm:text-sm">
                 {p.features.map((f) => (
                   <li key={f} className="flex items-start gap-1.5 text-ink">
@@ -368,19 +538,55 @@ function Pricing() {
                   </li>
                 ))}
               </ul>
-              <a
-                href={p.ctaHref}
-                className={`mt-5 flex h-9 w-full items-center justify-center text-sm sm:h-10 ${
-                  p.highlight ? "btn-primary" : "btn-ghost"
-                }`}
-              >
-                {p.cta}
-              </a>
+              {p.id === "free" ? (
+                <a
+                  href="#download"
+                  className="mt-5 flex h-9 w-full items-center justify-center text-sm sm:h-10 btn-ghost"
+                >
+                  {p.cta}
+                </a>
+              ) : (
+                <div className="mt-5 space-y-2">
+                  <button
+                    type="button"
+                    disabled={paidAction?.disabled || checkoutLoading === p.id}
+                    onClick={() => handlePurchase(p.id as "pro" | "ultimate")}
+                    className={`flex h-9 w-full items-center justify-center text-sm sm:h-10 ${
+                      paidAction?.disabled
+                        ? "cursor-not-allowed rounded-xl border border-slate-200 bg-slate-50 text-slate-400"
+                        : p.highlight
+                          ? "btn-primary"
+                          : "btn-ghost"
+                    }`}
+                  >
+                    {checkoutLoading === p.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      paidAction?.label ?? p.cta
+                    )}
+                  </button>
+                  {p.id === "pro" && user?.membership.can_manage_subscription && (
+                    <button
+                      type="button"
+                      disabled={portalLoading}
+                      onClick={handleManageSubscription}
+                      className="flex h-9 w-full items-center justify-center text-xs text-brand hover:underline sm:h-10"
+                    >
+                      {portalLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        "管理订阅 / 取消自动续费"
+                      )}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
-          ))}
+          );
+          })}
         </div>
         <p className="mt-4 text-center text-xs leading-relaxed text-slate-400">
-          * 定价与会员权益为产品规划展示；标 * 项尚未接入限流，当前版本下载功能完全免费开放体验。
+          * 标 * 限流项尚未接入；支付成功后对应方案按钮将显示「当前方案」并不可重复购买。Pro 月订可在「管理订阅」中取消自动续费（当期权益保留至到期）。
         </p>
       </div>
     </section>

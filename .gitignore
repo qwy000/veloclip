@@ -21,6 +21,9 @@ frontend/.vite/
 # Env & editor
 .env
 .env.local
+backend/data/
+backend/models/
+.firecrawl/
 .DS_Store
 .idea/
 .vscode/

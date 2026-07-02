@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+# 必须在导入 settings 之前加载 .env
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.ai_routes import router as ai_router
+from app.api.auth_routes import router as auth_router
+from app.api.billing_routes import router as billing_router
 from app.api.routes import router
-
-# 加载 backend/.env（若存在）
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 app = FastAPI(
     title="万能视频下载 API",
@@ -29,10 +34,17 @@ app.add_middleware(
 
 app.include_router(router)
 app.include_router(ai_router)
+app.include_router(auth_router)
+app.include_router(billing_router)
 
 
 @app.get("/health")
 def health() -> dict:
     import os
 
-    return {"status": "ok", "pid": os.getpid()}
+    return {
+        "status": "ok",
+        "pid": os.getpid(),
+        "version": "1.1.0",
+        "features": ["download", "ai", "auth", "billing"],
+    }

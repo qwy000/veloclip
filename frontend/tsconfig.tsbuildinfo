@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/components/downloader.tsx","./src/lib/api.ts"],"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/root.tsx","./src/main.tsx","./src/components/aianalyzer.tsx","./src/components/authmodal.tsx","./src/components/backendhealthbanner.tsx","./src/components/downloader.tsx","./src/context/authcontext.tsx","./src/lib/api.ts","./src/lib/auth.ts","./src/pages/billingpages.tsx","./src/pages/magiclinkpage.tsx"],"version":"5.9.3"}

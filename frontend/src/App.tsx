@@ -301,14 +301,51 @@ function Navbar({ onLogin }: { onLogin: () => void }) {
               {l.label}
             </a>
           ))}
-          <a href="#pricing" className="btn-primary mt-2 h-10 w-full text-sm">
-            升级 Pro
+          <a
+            href="#pricing"
+            onClick={() => setOpen(false)}
+            className="btn-primary mt-2 h-10 w-full text-sm"
+          >
+            {user?.membership.is_premium ? "查看会员" : "升级 Pro"}
           </a>
-          {!loading && !user && (
+          {!loading && user ? (
+            <div className="mt-3 space-y-3 border-t border-slate-100 pt-3">
+              <div className="flex min-w-0 items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm text-ink-muted">
+                <User className="h-4 w-4 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">{user.email}</span>
+                <span className="shrink-0 rounded-full bg-brand-50 px-2 py-0.5 text-xs text-brand">
+                  {user.membership.plan_label}
+                </span>
+              </div>
+              {user.membership.can_manage_subscription && (
+                <button
+                  type="button"
+                  className="w-full text-sm text-brand"
+                  onClick={() => {
+                    setOpen(false);
+                    openBillingPortal();
+                  }}
+                >
+                  管理订阅 / 取消续费
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  setOpen(false);
+                }}
+                className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 text-sm font-medium text-ink-muted transition hover:border-brand/40 hover:text-brand"
+              >
+                <LogOut className="h-4 w-4" />
+                退出登录
+              </button>
+            </div>
+          ) : !loading ? (
             <button type="button" onClick={() => { setOpen(false); onLogin(); }} className="mt-2 w-full text-sm text-brand">
               登录 / 注册
             </button>
-          )}
+          ) : null}
         </div>
       )}
     </header>

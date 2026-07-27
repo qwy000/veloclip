@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
+import { apiUrl } from "../lib/config";
 
 export default function BackendHealthBanner() {
   const [warning, setWarning] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/health")
+    fetch(apiUrl("/health"))
       .then((r) => r.json())
       .then((data) => {
         const features: string[] = data?.features ?? [];

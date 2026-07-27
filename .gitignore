@@ -17,6 +17,7 @@ backend/cookies/*.txt
 node_modules/
 frontend/dist/
 frontend/.vite/
+*.tsbuildinfo
 
 # Env & editor
 .env

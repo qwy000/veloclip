@@ -1,3 +1,5 @@
+import { apiUrl } from "./config";
+
 const TOKEN_KEY = "veloclip_access_token";
 
 export interface MembershipInfo {
@@ -81,7 +83,7 @@ async function parseError(res: Response): Promise<string> {
 }
 
 export async function authRegister(email: string, password: string): Promise<AuthMessageResponse> {
-  const res = await fetch("/api/auth/register", {
+  const res = await fetch(apiUrl("/api/auth/register"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
@@ -91,7 +93,7 @@ export async function authRegister(email: string, password: string): Promise<Aut
 }
 
 export async function authVerifyEmail(email: string, code: string): Promise<AuthTokenResponse> {
-  const res = await fetch("/api/auth/verify-email", {
+  const res = await fetch(apiUrl("/api/auth/verify-email"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, code }),
@@ -101,7 +103,7 @@ export async function authVerifyEmail(email: string, code: string): Promise<Auth
 }
 
 export async function authResendVerification(email: string): Promise<AuthMessageResponse> {
-  const res = await fetch("/api/auth/resend-verification", {
+  const res = await fetch(apiUrl("/api/auth/resend-verification"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email }),
@@ -111,7 +113,7 @@ export async function authResendVerification(email: string): Promise<AuthMessage
 }
 
 export async function authLogin(email: string, password: string): Promise<AuthTokenResponse> {
-  const res = await fetch("/api/auth/login", {
+  const res = await fetch(apiUrl("/api/auth/login"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
@@ -121,7 +123,7 @@ export async function authLogin(email: string, password: string): Promise<AuthTo
 }
 
 export async function authMagicLink(email: string): Promise<{ message: string }> {
-  const res = await fetch("/api/auth/magic-link", {
+  const res = await fetch(apiUrl("/api/auth/magic-link"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email }),
@@ -131,7 +133,7 @@ export async function authMagicLink(email: string): Promise<{ message: string }>
 }
 
 export async function authVerifyMagicLink(token: string): Promise<AuthTokenResponse> {
-  const res = await fetch("/api/auth/magic-link/verify", {
+  const res = await fetch(apiUrl("/api/auth/magic-link/verify"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token }),
@@ -141,19 +143,19 @@ export async function authVerifyMagicLink(token: string): Promise<AuthTokenRespo
 }
 
 export async function authMe(): Promise<UserPublic> {
-  const res = await fetch("/api/auth/me", { headers: authHeaders() });
+  const res = await fetch(apiUrl("/api/auth/me"), { headers: authHeaders() });
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
 }
 
 export async function fetchBillingPlans(): Promise<BillingPlan[]> {
-  const res = await fetch("/api/billing/plans");
+  const res = await fetch(apiUrl("/api/billing/plans"));
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
 }
 
 export async function createCheckout(plan: "pro" | "ultimate"): Promise<{ checkout_url: string; session_id: string }> {
-  const res = await fetch("/api/billing/checkout", {
+  const res = await fetch(apiUrl("/api/billing/checkout"), {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({ plan }),
@@ -167,7 +169,7 @@ export async function syncCheckoutSession(sessionId: string): Promise<{
   message: string;
   membership?: MembershipInfo;
 }> {
-  const res = await fetch("/api/billing/sync-checkout", {
+  const res = await fetch(apiUrl("/api/billing/sync-checkout"), {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({ session_id: sessionId }),
@@ -177,7 +179,7 @@ export async function syncCheckoutSession(sessionId: string): Promise<{
 }
 
 export async function createPortal(): Promise<{ portal_url: string }> {
-  const res = await fetch("/api/billing/portal", {
+  const res = await fetch(apiUrl("/api/billing/portal"), {
     method: "POST",
     headers: authHeaders(),
   });
@@ -186,7 +188,7 @@ export async function createPortal(): Promise<{ portal_url: string }> {
 }
 
 export async function fetchBillingStatus(): Promise<{ membership: MembershipInfo; stripe_customer_id?: string | null }> {
-  const res = await fetch("/api/billing/status", { headers: authHeaders() });
+  const res = await fetch(apiUrl("/api/billing/status"), { headers: authHeaders() });
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
 }

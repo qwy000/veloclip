@@ -1,3 +1,5 @@
+import { apiUrl } from "./config";
+
 export interface FormatOption {
   quality: string;
   label: string;
@@ -35,7 +37,7 @@ async function parseError(res: Response): Promise<string> {
 }
 
 export async function fetchInfo(url: string): Promise<VideoInfo> {
-  const res = await fetch("/api/info", {
+  const res = await fetch(apiUrl("/api/info"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url }),
@@ -45,7 +47,7 @@ export async function fetchInfo(url: string): Promise<VideoInfo> {
 }
 
 export async function startDownload(url: string, quality: string): Promise<string> {
-  const res = await fetch("/api/download", {
+  const res = await fetch(apiUrl("/api/download"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url, quality }),
@@ -56,18 +58,18 @@ export async function startDownload(url: string, quality: string): Promise<strin
 }
 
 export async function fetchProgress(taskId: string): Promise<Progress> {
-  const res = await fetch(`/api/progress/${taskId}`);
+  const res = await fetch(apiUrl(`/api/progress/${taskId}`));
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
 }
 
 export async function cancelDownload(taskId: string): Promise<void> {
-  const res = await fetch(`/api/cancel/${taskId}`, { method: "POST" });
+  const res = await fetch(apiUrl(`/api/cancel/${taskId}`), { method: "POST" });
   if (!res.ok) throw new Error(await parseError(res));
 }
 
 export function fileUrl(taskId: string): string {
-  return `/api/file/${taskId}`;
+  return apiUrl(`/api/file/${taskId}`);
 }
 
 export function formatBytes(bytes?: number | null): string {
@@ -118,7 +120,7 @@ export interface AiChatMessage {
 }
 
 export async function fetchAiAnalyze(url: string): Promise<AiAnalyzeResult> {
-  const res = await fetch("/api/ai/analyze", {
+  const res = await fetch(apiUrl("/api/ai/analyze"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url }),
@@ -134,7 +136,7 @@ export async function fetchAiChat(
   history: AiChatMessage[] = [],
   subtitleSource?: string | null,
 ): Promise<string> {
-  const res = await fetch("/api/ai/chat", {
+  const res = await fetch(apiUrl("/api/ai/chat"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

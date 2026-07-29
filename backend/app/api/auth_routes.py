@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends
 
 from app.models.schemas import (
@@ -15,11 +17,16 @@ from app.models.schemas import (
 from app.services import auth_service
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/register", response_model=MessageResponse)
 def register(req: RegisterRequest) -> MessageResponse:
-    result = auth_service.register_user(req.email, req.password)
+    try:
+        result = auth_service.register_user(req.email, req.password)
+    except Exception:
+        logger.exception("Failed to register user: %s", req.email)
+        raise
     return MessageResponse(**result)
 
 

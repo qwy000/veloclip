@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
@@ -17,6 +18,7 @@ from app.models.schemas import (
 from app.services import downloader
 
 router = APIRouter(prefix="/api")
+logger = logging.getLogger(__name__)
 
 # 下载为阻塞操作，放入线程池，避免阻塞事件循环
 _executor = ThreadPoolExecutor(max_workers=4)
@@ -32,6 +34,7 @@ def get_info(req: InfoRequest) -> InfoResponse:
     try:
         return downloader.extract_info(url)
     except Exception as exc:  # noqa: BLE001
+        logger.exception("Failed to extract info for url: %s", url)
         raise HTTPException(status_code=422, detail=downloader._friendly_error(str(exc)))
 
 

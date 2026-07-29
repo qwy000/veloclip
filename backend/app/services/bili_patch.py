@@ -112,7 +112,16 @@ def apply_patch() -> None:
     #      编码，破坏了 w_rid 签名 -> 改为自行拼成完整 URL，不再用 query= 二次编码；
     #   2) Referer 指向被 WAF 风控的 /video/ 页面会被拦 412 -> 改用站点首页作为 Referer。
     # 修复后仍走 yt-dlp 网络层，保留 cookie / 代理 / UA 等能力。免 Cookie 实测可取流。
-    def patched_download_playinfo(self, bvid, cid, headers=None, query=None):
+    def patched_download_playinfo(
+        self,
+        bvid,
+        cid,
+        headers=None,
+        query=None,
+        *args,
+        fatal=True,
+        **kwargs,
+    ):
         params = {"bvid": bvid, "cid": cid, "fnval": 4048, **(query or {})}
         if self.is_logged_in:
             params.pop("try_look", None)
@@ -128,7 +137,14 @@ def apply_patch() -> None:
         req_headers = dict(headers or {})
         req_headers["User-Agent"] = _DESKTOP_UA
         req_headers["Referer"] = "https://www.bilibili.com/"
-        return self._download_json(full_url, bvid, headers=req_headers, note=note)["data"]
+        result = self._download_json(
+            full_url,
+            bvid,
+            headers=req_headers,
+            note=note,
+            fatal=fatal,
+        )
+        return (result or {}).get("data")
 
     BiliBiliIE._download_playinfo = patched_download_playinfo
     _applied = True
